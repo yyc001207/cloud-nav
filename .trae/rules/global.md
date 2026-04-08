@@ -1,8 +1,6 @@
 ---
-alwaysApply: true
-description: 全局开发规则，适用于所有代码开发
+alwaysApply: false
 ---
-
 # 全局开发规则
 
 ## 通用规范
