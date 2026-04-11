@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -8,6 +8,11 @@ class IconInfo(BaseModel):
     url: Optional[str] = Field(None, description="文件 URL")
     text: Optional[str] = Field(None, description="显示文字")
     backgroundColor: Optional[str] = Field("#2ecc71", description="背景颜色")
+
+
+class DocumentLink(BaseModel):
+    title: str = Field(..., description="文档标题")
+    url: str = Field(..., description="文档地址")
 
 
 class TabCreateRequest(BaseModel):
@@ -21,6 +26,20 @@ class TabUpdateRequest(BaseModel):
     label: Optional[str] = Field(None, description="标签名称")
     desc: Optional[str] = Field(None, description="描述")
     order: Optional[int] = Field(None, description="排序值")
+
+
+class TabListRequest(BaseModel):
+    pageNum: Optional[int] = Field(
+        None, description="页码，从 1 开始，与 pageSize 同时传入时生效"
+    )
+    pageSize: Optional[int] = Field(
+        None, description="每页数量，与 pageNum 同时传入时生效"
+    )
+    label: Optional[str] = Field(None, description="标签名称模糊查询")
+    orderBy: Optional[str] = Field(
+        None, description="排序字段：order、createdAt、updatedAt"
+    )
+    orderDir: Optional[str] = Field(None, description="排序方向：asc 或 desc")
 
 
 class TabResponse(BaseModel):
@@ -38,8 +57,7 @@ class WebsiteCreateRequest(BaseModel):
     url: str = Field(..., description="网站地址")
     desc: Optional[str] = Field(None, description="描述")
     icon: Optional[IconInfo] = Field(None, description="图标信息")
-    github: Optional[str] = Field(None, description="GitHub 地址")
-    document: Optional[str] = Field(None, description="文档地址")
+    document: Optional[List[DocumentLink]] = Field(None, description="文档链接列表")
     tabId: int = Field(..., description="关联的 Tab ID")
     order: Optional[int] = Field(None, description="排序值")
 
@@ -50,8 +68,7 @@ class WebsiteUpdateRequest(BaseModel):
     url: Optional[str] = Field(None, description="网站地址")
     desc: Optional[str] = Field(None, description="描述")
     icon: Optional[IconInfo] = Field(None, description="图标信息")
-    github: Optional[str] = Field(None, description="GitHub 地址")
-    document: Optional[str] = Field(None, description="文档地址")
+    document: Optional[List[DocumentLink]] = Field(None, description="文档链接列表")
     tabId: Optional[int] = Field(None, description="关联的 Tab ID")
     order: Optional[int] = Field(None, description="排序值")
 
@@ -64,8 +81,7 @@ class WebsiteResponse(BaseModel):
     url: str
     desc: Optional[str] = None
     icon: Optional[dict] = None
-    github: Optional[str] = None
-    document: Optional[str] = None
+    document: Optional[List[dict]] = None
     order: Optional[int] = None
     createdAt: Optional[datetime] = None
     updatedAt: Optional[datetime] = None
@@ -79,5 +95,13 @@ class WebsiteOrderRequest(BaseModel):
 class WebsiteListRequest(BaseModel):
     tabId: Optional[int] = Field(None, description="Tab ID")
     label: Optional[str] = Field(None, description="网站名称模糊查询")
-    pageNum: int = Field(1, description="页码")
-    pageSize: int = Field(0, description="每页数量，0 表示返回所有")
+    pageNum: Optional[int] = Field(
+        None, description="页码，从 1 开始，与 pageSize 同时传入时生效"
+    )
+    pageSize: Optional[int] = Field(
+        None, description="每页数量，与 pageNum 同时传入时生效"
+    )
+    orderBy: Optional[str] = Field(
+        None, description="排序字段：order、label、createdAt、updatedAt"
+    )
+    orderDir: Optional[str] = Field(None, description="排序方向：asc 或 desc")

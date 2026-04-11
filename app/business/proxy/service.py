@@ -1,7 +1,7 @@
 from typing import Optional
 import asyncio
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models import HolidayModel
 from app.core.config import settings
@@ -29,7 +29,9 @@ async def get_city_location(location: str) -> Optional[list[dict]]:
     url = f"{settings.QWEATHER_HOST}/geo/v2/city/lookup"
     headers = {"X-QW-Api-Key": settings.QWEATHER_KEY}
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params={"location": location}, headers=headers, timeout=10.0)
+        response = await client.get(
+            url, params={"location": location}, headers=headers, timeout=10.0
+        )
         data = response.json()
     if data.get("code") == "200":
         result = data.get("location", [])
@@ -46,7 +48,9 @@ async def get_weather_now(location_id: str) -> Optional[dict]:
     url = f"{settings.QWEATHER_HOST}/v7/weather/now"
     headers = {"X-QW-Api-Key": settings.QWEATHER_KEY}
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params={"location": location_id}, headers=headers, timeout=10.0)
+        response = await client.get(
+            url, params={"location": location_id}, headers=headers, timeout=10.0
+        )
         data = response.json()
     if data.get("code") == "200":
         result = data.get("now", {})
@@ -63,7 +67,9 @@ async def get_weather_hourly(location_id: str) -> list[dict]:
     url = f"{settings.QWEATHER_HOST}/v7/weather/24h"
     headers = {"X-QW-Api-Key": settings.QWEATHER_KEY}
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params={"location": location_id}, headers=headers, timeout=10.0)
+        response = await client.get(
+            url, params={"location": location_id}, headers=headers, timeout=10.0
+        )
         data = response.json()
     if data.get("code") == "200":
         result = data.get("hourly", [])
@@ -80,7 +86,9 @@ async def get_weather_daily(location_id: str) -> list[dict]:
     url = f"{settings.QWEATHER_HOST}/v7/weather/7d"
     headers = {"X-QW-Api-Key": settings.QWEATHER_KEY}
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params={"location": location_id}, headers=headers, timeout=10.0)
+        response = await client.get(
+            url, params={"location": location_id}, headers=headers, timeout=10.0
+        )
         data = response.json()
     if data.get("code") == "200":
         result = data.get("daily", [])
@@ -94,7 +102,9 @@ async def get_air_quality(longitude: float, latitude: float) -> Optional[dict]:
     cached = await cache_get_json(cache_key)
     if cached:
         return cached
-    url = f"{settings.QWEATHER_HOST}/airquality/v1/current/{latitude:.2f}/{longitude:.2f}"
+    url = (
+        f"{settings.QWEATHER_HOST}/airquality/v1/current/{latitude:.2f}/{longitude:.2f}"
+    )
     headers = {"X-QW-Api-Key": settings.QWEATHER_KEY}
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers, timeout=10.0)
@@ -160,14 +170,47 @@ async def fetch_holiday_from_api(year: int) -> Optional[dict]:
                 adjustment_dates.append(date_str)
     holiday_dates.sort()
     adjustment_dates.sort()
-    return {"year": year, "holiday": ",".join(holiday_dates), "adjustment": ",".join(adjustment_dates)}
+    return {
+        "year": year,
+        "holiday": ",".join(holiday_dates),
+        "adjustment": ",".join(adjustment_dates),
+    }
 
 
-async def get_all_holidays(session: AsyncSession) -> list[dict]:
-    stmt = select(HolidayModel).order_by(HolidayModel.year.asc())
+HOLIDAY_ORDER_FIELDS = {
+    "year": HolidayModel.year,
+    "createdAt": HolidayModel.created_at,
+    "updatedAt": HolidayModel.updated_at,
+}
+
+
+async def get_all_holidays(
+    session: AsyncSession,
+    year: Optional[int] = None,
+    page: Optional[int] = None,
+    size: Optional[int] = None,
+    order_by: Optional[str] = None,
+    order_dir: str = "asc",
+) -> tuple[list[dict], int]:
+    stmt = select(HolidayModel)
+    count_stmt = select(sa_func.count()).select_from(HolidayModel)
+    if year is not None:
+        stmt = stmt.where(HolidayModel.year == year)
+        count_stmt = count_stmt.where(HolidayModel.year == year)
+    order_column = HOLIDAY_ORDER_FIELDS.get(order_by) if order_by else None
+    if order_column is not None:
+        stmt = stmt.order_by(
+            order_column.desc() if order_dir == "desc" else order_column.asc()
+        )
+    else:
+        stmt = stmt.order_by(HolidayModel.year.asc())
+    total_result = await session.execute(count_stmt)
+    total = total_result.scalar_one()
+    if page is not None and size is not None and size > 0:
+        stmt = stmt.offset((page - 1) * size).limit(size)
     result = await session.execute(stmt)
     holidays = result.scalars().all()
-    return [holiday_to_dict(h) for h in holidays]
+    return [holiday_to_dict(h) for h in holidays], total
 
 
 async def get_holiday_by_year(session: AsyncSession, year: int) -> Optional[dict]:
@@ -191,7 +234,9 @@ async def create_or_update_holiday(session: AsyncSession, year: int) -> dict:
         await session.commit()
         await session.refresh(holiday)
         return holiday_to_dict(holiday)
-    holiday = HolidayModel(year=year, holiday=api_data["holiday"], adjustment=api_data["adjustment"])
+    holiday = HolidayModel(
+        year=year, holiday=api_data["holiday"], adjustment=api_data["adjustment"]
+    )
     session.add(holiday)
     await session.commit()
     await session.refresh(holiday)

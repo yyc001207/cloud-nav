@@ -32,21 +32,6 @@ async def get_user_by_name(session: AsyncSession, user_name: str) -> Optional[di
     return user_to_dict(user)
 
 
-async def create_user(session: AsyncSession, user_name: str, password: str, is_active: bool = True) -> dict:
-    existing = await get_user_by_name(session, user_name)
-    if existing:
-        raise ValidationException("用户名已存在")
-    user = UserModel(
-        user_name=user_name,
-        password=get_password_hash(password),
-        is_active=is_active,
-    )
-    session.add(user)
-    await session.commit()
-    await session.refresh(user)
-    return user_to_dict(user)
-
-
 async def update_user(session: AsyncSession, user_id: int, update_data: dict) -> dict:
     user = await session.get(UserModel, user_id)
     if not user:

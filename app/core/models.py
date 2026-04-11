@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, BigInteger, JSON, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    Text,
+    DateTime,
+    BigInteger,
+    JSON,
+    Index,
+)
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -27,7 +37,9 @@ class TabModel(Base):
 
 class WebsiteModel(Base):
     __tablename__ = "websites"
-    __table_args__ = (Index("idx_websites_user_tab_order", "user_id", "tab_id", "order"),)
+    __table_args__ = (
+        Index("idx_websites_user_tab_order", "user_id", "tab_id", "order"),
+    )
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False, index=True)
     tab_id = Column(Integer, nullable=False, index=True)
@@ -35,8 +47,7 @@ class WebsiteModel(Base):
     url = Column(String(500), nullable=False)
     desc = Column(String(500), nullable=True)
     icon = Column(JSON, nullable=True)
-    github = Column(String(500), nullable=True)
-    document = Column(String(500), nullable=True)
+    document = Column(JSON, nullable=True)
     order = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

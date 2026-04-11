@@ -5,20 +5,32 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.business.openlist.schema import (
-    OpenListGlobalConfigCreateRequest, OpenListGlobalConfigUpdateRequest,
-    OpenListTaskConfigCreateRequest, OpenListTaskConfigUpdateRequest,
+    OpenListGlobalConfigCreateRequest,
+    OpenListGlobalConfigUpdateRequest,
+    OpenListTaskConfigCreateRequest,
+    OpenListTaskConfigUpdateRequest,
     OpenListExecuteRequest,
+    TaskConfigListRequest,
 )
 from app.business.openlist.service import (
-    create_global_config, get_global_config, update_global_config, delete_global_config,
-    create_task_config, get_task_config, update_task_config, delete_task_config,
-    list_task_configs, add_execution_record, get_global_config_by_id, get_task_config_by_id,
+    create_global_config,
+    get_global_config,
+    update_global_config,
+    delete_global_config,
+    create_task_config,
+    get_task_config,
+    update_task_config,
+    delete_task_config,
+    list_task_configs,
+    add_execution_record,
+    get_global_config_by_id,
+    get_task_config_by_id,
 )
 from app.business.openlist.strm_generator import STRMGenerator
 from app.business.openlist.task_status_manager import TaskStatusManager
 from app.core.websocket_manager import manager
 from app.core.logger import logger, set_websocket_broadcast
-from app.utils.response import success_response
+from app.utils.response import success_response, paginated_response
 from app.core.exceptions import NotFoundException, ValidationException
 from app.api.user import get_current_user_id
 
@@ -26,14 +38,21 @@ router = APIRouter(prefix="/api/openlist", tags=["OpenList STRM"])
 
 
 @router.post("/global-config")
-async def get_global_config_route(authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def get_global_config_route(
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     config = await get_global_config(session, user_id)
     return success_response(config)
 
 
 @router.post("/global-config/add")
-async def add_global_config(request: OpenListGlobalConfigCreateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def add_global_config(
+    request: OpenListGlobalConfigCreateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await create_global_config(session, user_id, data)
@@ -41,7 +60,11 @@ async def add_global_config(request: OpenListGlobalConfigCreateRequest, authoriz
 
 
 @router.post("/global-config/update")
-async def update_global_config_route(request: OpenListGlobalConfigUpdateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def update_global_config_route(
+    request: OpenListGlobalConfigUpdateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await update_global_config(session, user_id, data)
@@ -49,7 +72,10 @@ async def update_global_config_route(request: OpenListGlobalConfigUpdateRequest,
 
 
 @router.post("/global-config/delete")
-async def delete_global_config_route(authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def delete_global_config_route(
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     success = await delete_global_config(session, user_id)
     if not success:
@@ -58,14 +84,32 @@ async def delete_global_config_route(authorization: Optional[str] = Header(None)
 
 
 @router.post("/task-config/list")
-async def list_task_configs_route(authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def list_task_configs_route(
+    request: TaskConfigListRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
-    configs = await list_task_configs(session, user_id)
+    configs, total = await list_task_configs(
+        session,
+        user_id,
+        request.pageNum,
+        request.pageSize,
+        request.name,
+        request.orderBy,
+        request.orderDir,
+    )
+    if request.pageNum is not None and request.pageSize is not None:
+        return paginated_response(configs, total)
     return success_response(configs)
 
 
 @router.post("/task-config")
-async def get_task_config_route(id: int, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def get_task_config_route(
+    id: int,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     config = await get_task_config(session, user_id, id)
     if not config:
@@ -74,7 +118,11 @@ async def get_task_config_route(id: int, authorization: Optional[str] = Header(N
 
 
 @router.post("/task-config/add")
-async def add_task_config(request: OpenListTaskConfigCreateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def add_task_config(
+    request: OpenListTaskConfigCreateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await create_task_config(session, user_id, data)
@@ -82,7 +130,12 @@ async def add_task_config(request: OpenListTaskConfigCreateRequest, authorizatio
 
 
 @router.post("/task-config/update")
-async def update_task_config_route(id: int, request: OpenListTaskConfigUpdateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def update_task_config_route(
+    id: int,
+    request: OpenListTaskConfigUpdateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await update_task_config(session, user_id, id, data)
@@ -90,7 +143,11 @@ async def update_task_config_route(id: int, request: OpenListTaskConfigUpdateReq
 
 
 @router.post("/task-config/delete")
-async def delete_task_config_route(id: int, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def delete_task_config_route(
+    id: int,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     success = await delete_task_config(session, user_id, id)
     if not success:
@@ -99,9 +156,15 @@ async def delete_task_config_route(id: int, authorization: Optional[str] = Heade
 
 
 @router.post("/execute")
-async def execute_strm_task(request: OpenListExecuteRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def execute_strm_task(
+    request: OpenListExecuteRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
-    global_config = await get_global_config_by_id(session, request.globalConfigId, user_id)
+    global_config = await get_global_config_by_id(
+        session, request.globalConfigId, user_id
+    )
     if not global_config:
         raise NotFoundException("全局配置")
     task_config = await get_task_config_by_id(session, request.taskConfigId, user_id)
@@ -114,19 +177,29 @@ async def execute_strm_task(request: OpenListExecuteRequest, authorization: Opti
         try:
             stats = await generator.execute(force=request.force)
             await add_execution_record(
-                session, user_id, request.taskConfigId,
-                success=True, message="执行完成", **stats,
+                session,
+                user_id,
+                request.taskConfigId,
+                success=True,
+                message="执行完成",
+                **stats,
             )
         except asyncio.CancelledError:
             await add_execution_record(
-                session, user_id, request.taskConfigId,
-                success=False, message="任务已取消",
+                session,
+                user_id,
+                request.taskConfigId,
+                success=False,
+                message="任务已取消",
             )
         except Exception as e:
             logger.error(f"STRM 任务执行失败: {e}")
             await add_execution_record(
-                session, user_id, request.taskConfigId,
-                success=False, message=str(e),
+                session,
+                user_id,
+                request.taskConfigId,
+                success=False,
+                message=str(e),
             )
         finally:
             TaskStatusManager.unregister_task(task_id)

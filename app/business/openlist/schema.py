@@ -6,8 +6,13 @@ from datetime import datetime
 class OpenListGlobalConfigCreateRequest(BaseModel):
     baseUrl: str = Field(..., description="OpenList 服务器地址")
     token: str = Field(..., description="OpenList Token")
-    videoExtensions: Optional[List[str]] = Field(default=[".mp4", ".mkv", ".avi", ".wmv", ".flv", ".mov", ".webm"], description="视频格式")
-    subtitleExtensions: Optional[List[str]] = Field(default=[".srt", ".ass", ".ssa", ".sub", ".vtt"], description="字幕格式")
+    videoExtensions: Optional[List[str]] = Field(
+        default=[".mp4", ".mkv", ".avi", ".wmv", ".flv", ".mov", ".webm"],
+        description="视频格式",
+    )
+    subtitleExtensions: Optional[List[str]] = Field(
+        default=[".srt", ".ass", ".ssa", ".sub", ".vtt"], description="字幕格式"
+    )
 
 
 class OpenListGlobalConfigUpdateRequest(BaseModel):
@@ -29,6 +34,20 @@ class OpenListTaskConfigUpdateRequest(BaseModel):
     outputDir: Optional[str] = None
     taskPaths: Optional[str] = None
     maxScanDepth: Optional[int] = None
+
+
+class TaskConfigListRequest(BaseModel):
+    pageNum: Optional[int] = Field(
+        None, description="页码，从 1 开始，与 pageSize 同时传入时生效"
+    )
+    pageSize: Optional[int] = Field(
+        None, description="每页数量，与 pageNum 同时传入时生效"
+    )
+    name: Optional[str] = Field(None, description="任务配置名称模糊查询")
+    orderBy: Optional[str] = Field(
+        None, description="排序字段：createdAt、updatedAt、name"
+    )
+    orderDir: Optional[str] = Field(None, description="排序方向：asc 或 desc")
 
 
 class OpenListGlobalConfigResponse(BaseModel):

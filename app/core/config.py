@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
-    QWEATHER_HOST: str = ""
-    QWEATHER_KEY: str = ""
+    QWEATHER_HOST: str = "https://kp7p43ap5m.re.qweatherapi.com"
+    QWEATHER_KEY: str = "789888e491fd449cb34cc0f21c040f10"
 
-    HOLIDAY_API_BASE: str = "http://timor.tech/api/holiday/year"
+    HOLIDAY_API_BASE: str = ""
 
     @property
     def MYSQL_URL(self) -> str:

@@ -54,5 +54,13 @@ class FileCompleteRequest(BaseModel):
 
 class TransferListRequest(BaseModel):
     date: Optional[str] = Field(None, description="按日期查询，格式：YYYY-MM-DD")
-    pageNum: int = Field(1, description="页码")
-    pageSize: int = Field(10, description="每页大小")
+    pageNum: Optional[int] = Field(
+        None, description="页码，从 1 开始，与 pageSize 同时传入时生效"
+    )
+    pageSize: Optional[int] = Field(
+        None, description="每页数量，与 pageNum 同时传入时生效"
+    )
+    keyword: Optional[str] = Field(None, description="关键词模糊查询")
+    status: Optional[str] = Field(None, description="文件状态过滤：pending、completed")
+    orderBy: Optional[str] = Field(None, description="排序字段：createdAt、updatedAt、fileSize")
+    orderDir: Optional[str] = Field(None, description="排序方向：asc 或 desc")

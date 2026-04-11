@@ -3,12 +3,23 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.business.nav.schema import (
-    TabCreateRequest, TabUpdateRequest, WebsiteCreateRequest,
-    WebsiteUpdateRequest, WebsiteOrderRequest, WebsiteListRequest,
+    TabCreateRequest,
+    TabUpdateRequest,
+    TabListRequest,
+    WebsiteCreateRequest,
+    WebsiteUpdateRequest,
+    WebsiteOrderRequest,
+    WebsiteListRequest,
 )
 from app.business.nav.service import (
-    get_all_tabs, create_tab, update_tab, delete_tab,
-    get_all_websites, create_website, update_website, delete_website,
+    get_all_tabs,
+    create_tab,
+    update_tab,
+    delete_tab,
+    get_all_websites,
+    create_website,
+    update_website,
+    delete_website,
     batch_update_website_order,
 )
 from app.utils.response import success_response, paginated_response
@@ -19,14 +30,27 @@ router = APIRouter(prefix="/api/nav", tags=["导航管理"])
 
 
 @router.post("/tabs")
-async def list_tabs(authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def list_tabs(
+    request: TabListRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
-    tabs = await get_all_tabs(session, user_id)
+    tabs, total = await get_all_tabs(
+        session, user_id, request.pageNum, request.pageSize,
+        request.label, request.orderBy, request.orderDir
+    )
+    if request.pageNum is not None and request.pageSize is not None:
+        return paginated_response(tabs, total)
     return success_response(tabs)
 
 
 @router.post("/tab/add")
-async def add_tab(request: TabCreateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def add_tab(
+    request: TabCreateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     tab = await create_tab(session, data, user_id)
@@ -34,7 +58,11 @@ async def add_tab(request: TabCreateRequest, authorization: Optional[str] = Head
 
 
 @router.post("/tab/update")
-async def update_tab_route(request: TabUpdateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def update_tab_route(
+    request: TabUpdateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     tab = await update_tab(session, request.id, data, user_id)
@@ -44,7 +72,11 @@ async def update_tab_route(request: TabUpdateRequest, authorization: Optional[st
 
 
 @router.post("/tab/delete")
-async def delete_tab_route(id: int, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def delete_tab_route(
+    id: int,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     success = await delete_tab(session, id, user_id)
     if not success:
@@ -53,16 +85,33 @@ async def delete_tab_route(id: int, authorization: Optional[str] = Header(None),
 
 
 @router.post("/websites")
-async def list_websites(request: WebsiteListRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def list_websites(
+    request: WebsiteListRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
-    websites, total = await get_all_websites(session, user_id, request.tabId, request.label, request.pageNum, request.pageSize)
-    if request.pageSize > 0:
+    websites, total = await get_all_websites(
+        session,
+        user_id,
+        request.tabId,
+        request.label,
+        request.pageNum,
+        request.pageSize,
+        request.orderBy,
+        request.orderDir,
+    )
+    if request.pageNum is not None and request.pageSize is not None:
         return paginated_response(websites, total)
     return success_response(websites)
 
 
 @router.post("/website/add")
-async def add_website(request: WebsiteCreateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def add_website(
+    request: WebsiteCreateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     website = await create_website(session, data, user_id)
@@ -70,7 +119,11 @@ async def add_website(request: WebsiteCreateRequest, authorization: Optional[str
 
 
 @router.post("/website/update")
-async def update_website_route(request: WebsiteUpdateRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def update_website_route(
+    request: WebsiteUpdateRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     website = await update_website(session, request.id, data, user_id)
@@ -80,7 +133,11 @@ async def update_website_route(request: WebsiteUpdateRequest, authorization: Opt
 
 
 @router.post("/website/delete")
-async def delete_website_route(id: int, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def delete_website_route(
+    id: int,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
     success = await delete_website(session, id, user_id)
     if not success:
@@ -89,7 +146,13 @@ async def delete_website_route(id: int, authorization: Optional[str] = Header(No
 
 
 @router.post("/website/order")
-async def update_website_order(request: WebsiteOrderRequest, authorization: Optional[str] = Header(None), session: AsyncSession = Depends(get_session)):
+async def update_website_order(
+    request: WebsiteOrderRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     user_id = await get_current_user_id(authorization)
-    await batch_update_website_order(session, request.tabId, request.websiteIds, user_id)
+    await batch_update_website_order(
+        session, request.tabId, request.websiteIds, user_id
+    )
     return success_response(msg="排序更新成功")
