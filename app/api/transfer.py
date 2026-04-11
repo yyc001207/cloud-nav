@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, Header
+import os
+import re
+from fastapi import APIRouter, Depends, Header, Request
 from typing import Optional
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.business.transfer.schema import (
@@ -8,6 +11,7 @@ from app.business.transfer.schema import (
     FileTransferCreateRequest,
     FileCompleteRequest,
     TransferListRequest,
+    FileDownloadRequest,
 )
 from app.business.transfer.service import (
     create_text_transfer,
@@ -20,9 +24,12 @@ from app.business.transfer.service import (
     complete_upload,
     get_file_transfers_by_user,
     delete_file_transfer,
+    get_file_for_download,
+    file_chunk_generator,
+    get_file_path,
 )
 from app.utils.response import success_response, paginated_response
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.api.user import get_current_user_id
 
 router = APIRouter(prefix="/api/transfer", tags=["中转站"])
@@ -151,3 +158,76 @@ async def delete_file_transfer_route(
     if not success:
         raise NotFoundException("文件中转")
     return success_response(msg="删除成功")
+
+
+def parse_range_header(range_header: str, file_size: int):
+    match = re.match(r"bytes=(\d*)-(\d*)", range_header)
+    if not match:
+        return None
+    start_str, end_str = match.group(1), match.group(2)
+    if start_str == "" and end_str == "":
+        return None
+    if start_str == "":
+        suffix = int(end_str)
+        start = max(0, file_size - suffix)
+        end = file_size - 1
+    elif end_str == "":
+        start = int(start_str)
+        end = file_size - 1
+    else:
+        start = int(start_str)
+        end = min(int(end_str), file_size - 1)
+    if start > end or start >= file_size:
+        return None
+    return start, end
+
+
+@router.post("/file/download")
+async def download_file(
+    request: FileDownloadRequest,
+    fastapi_request: Request,
+    authorization: Optional[str] = Header(None),
+    range: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = await get_current_user_id(authorization)
+    file_record = await get_file_for_download(session, request.fileId, user_id)
+    if not file_record:
+        raise NotFoundException("文件")
+    if file_record.status != "completed":
+        raise ValidationException("文件尚未上传完成")
+    file_path = get_file_path(request.fileId)
+    if not os.path.exists(file_path):
+        raise NotFoundException("文件")
+    file_size = os.path.getsize(file_path)
+    content_type = file_record.content_type or "application/octet-stream"
+    filename = file_record.filename
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Accept-Ranges": "bytes",
+    }
+    if range:
+        parsed = parse_range_header(range, file_size)
+        if parsed is None:
+            return JSONResponse(
+                status_code=416,
+                content={"code": 416, "msg": "Range 不可满足"},
+                headers={"Content-Range": f"bytes */{file_size}"},
+            )
+        start, end = parsed
+        content_length = end - start + 1
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        headers["Content-Length"] = str(content_length)
+        return StreamingResponse(
+            file_chunk_generator(file_path, start, end),
+            status_code=206,
+            media_type=content_type,
+            headers=headers,
+        )
+    headers["Content-Length"] = str(file_size)
+    return StreamingResponse(
+        file_chunk_generator(file_path, 0, file_size - 1),
+        status_code=200,
+        media_type=content_type,
+        headers=headers,
+    )

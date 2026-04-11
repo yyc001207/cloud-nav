@@ -64,3 +64,7 @@ class TransferListRequest(BaseModel):
     status: Optional[str] = Field(None, description="文件状态过滤：pending、completed")
     orderBy: Optional[str] = Field(None, description="排序字段：createdAt、updatedAt、fileSize")
     orderDir: Optional[str] = Field(None, description="排序方向：asc 或 desc")
+
+
+class FileDownloadRequest(BaseModel):
+    fileId: int = Field(..., description="文件 ID")

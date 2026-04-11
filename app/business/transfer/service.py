@@ -64,14 +64,17 @@ async def get_text_transfers_by_user(
     conditions = [TextTransferModel.user_id == user_id]
     if keyword:
         conditions.append(
-            (TextTransferModel.title.like(f"%{keyword}%")) | (TextTransferModel.content.like(f"%{keyword}%"))
+            (TextTransferModel.title.like(f"%{keyword}%"))
+            | (TextTransferModel.content.like(f"%{keyword}%"))
         )
     count_stmt = select(func.count()).where(*conditions)
     total = (await session.execute(count_stmt)).scalar() or 0
     stmt = select(TextTransferModel).where(*conditions)
     order_column = TEXT_TRANSFER_ORDER_FIELDS.get(order_by) if order_by else None
     if order_column is not None:
-        stmt = stmt.order_by(order_column.desc() if order_dir == "desc" else order_column.asc())
+        stmt = stmt.order_by(
+            order_column.desc() if order_dir == "desc" else order_column.asc()
+        )
     else:
         stmt = stmt.order_by(TextTransferModel.created_at.asc())
     if page is not None and page_size is not None and page_size > 0:
@@ -245,7 +248,9 @@ async def get_file_transfers_by_user(
     stmt = select(FileTransferModel).where(*conditions)
     order_column = FILE_TRANSFER_ORDER_FIELDS.get(order_by) if order_by else None
     if order_column is not None:
-        stmt = stmt.order_by(order_column.desc() if order_dir == "desc" else order_column.asc())
+        stmt = stmt.order_by(
+            order_column.desc() if order_dir == "desc" else order_column.asc()
+        )
     else:
         stmt = stmt.order_by(FileTransferModel.created_at.asc())
     if page is not None and page_size is not None and page_size > 0:
@@ -282,3 +287,29 @@ async def delete_file_transfer(
     await session.delete(file)
     await session.commit()
     return True
+
+
+CHUNK_SIZE = 64 * 1024
+
+
+async def file_chunk_generator(file_path: str, start: int = 0, end: int = 0):
+    with open(file_path, "rb") as f:
+        f.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            chunk = f.read(min(CHUNK_SIZE, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
+
+
+async def get_file_for_download(
+    session: AsyncSession, file_id: int, user_id: int
+) -> FileTransferModel:
+    stmt = select(FileTransferModel).where(
+        FileTransferModel.id == file_id, FileTransferModel.user_id == user_id
+    )
+    result = await session.execute(stmt)
+    file = result.scalar_one_or_none()
+    return file
