@@ -283,3 +283,40 @@ async def add_execution_record(
     await session.commit()
     await session.refresh(config)
     return task_config_to_response(config)
+
+
+async def get_latest_execution_results(
+    session: AsyncSession, user_id: int
+) -> list[dict]:
+    stmt = (
+        select(OpenListTaskConfigModel)
+        .where(OpenListTaskConfigModel.user_id == user_id)
+        .order_by(OpenListTaskConfigModel.updated_at.desc())
+    )
+    result = await session.execute(stmt)
+    configs = result.scalars().all()
+    results = []
+    for config in configs:
+        history = config.execution_history or []
+        latest = history[-1] if history else None
+        results.append(
+            {
+                "taskConfigId": config.id,
+                "taskConfigName": config.name,
+                "latestExecution": latest,
+            }
+        )
+    return results
+
+
+async def get_task_execution_history(
+    session: AsyncSession, user_id: int, task_config_id: int
+) -> list[dict]:
+    stmt = select(OpenListTaskConfigModel).where(
+        OpenListTaskConfigModel.id == task_config_id,
+        OpenListTaskConfigModel.user_id == user_id,
+    )
+    config = (await session.execute(stmt)).scalar_one_or_none()
+    if not config:
+        raise NotFoundException("任务配置")
+    return config.execution_history or []

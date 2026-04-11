@@ -9,7 +9,11 @@ class TaskStatusManager:
 
     @classmethod
     def register_task(cls, task_id: str, task: asyncio.Task) -> None:
-        cls._running_tasks[task_id] = {"task": task, "cancelled": False, "start_time": datetime.utcnow()}
+        cls._running_tasks[task_id] = {
+            "task": task,
+            "cancelled": False,
+            "start_time": datetime.utcnow(),
+        }
         logger.info(f"任务 {task_id} 已注册")
 
     @classmethod
@@ -54,5 +58,20 @@ class TaskStatusManager:
         result = {}
         for task_id, info in cls._running_tasks.items():
             if not info["task"].done():
-                result[task_id] = {"task_id": task_id, "start_time": info["start_time"], "cancelled": info["cancelled"]}
+                result[task_id] = {
+                    "task_id": task_id,
+                    "start_time": info["start_time"],
+                    "cancelled": info["cancelled"],
+                }
         return result
+
+    @classmethod
+    def get_task_status(cls, task_id: str) -> str:
+        if task_id not in cls._running_tasks:
+            return "not_found"
+        task_info = cls._running_tasks[task_id]
+        if task_info["cancelled"]:
+            return "cancelled"
+        if task_info["task"].done():
+            return "completed"
+        return "running"

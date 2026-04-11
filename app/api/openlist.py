@@ -11,6 +11,7 @@ from app.business.openlist.schema import (
     OpenListTaskConfigUpdateRequest,
     OpenListExecuteRequest,
     TaskConfigListRequest,
+    TaskHistoryRequest,
 )
 from app.business.openlist.service import (
     create_global_config,
@@ -25,6 +26,8 @@ from app.business.openlist.service import (
     add_execution_record,
     get_global_config_by_id,
     get_task_config_by_id,
+    get_latest_execution_results,
+    get_task_execution_history,
 )
 from app.business.openlist.strm_generator import STRMGenerator
 from app.business.openlist.task_status_manager import TaskStatusManager
@@ -212,8 +215,51 @@ async def execute_strm_task(
 @router.post("/cancel")
 async def cancel_strm_task(taskId: str, authorization: Optional[str] = Header(None)):
     await get_current_user_id(authorization)
-    success = await TaskStatusManager.cancel_task(taskId)
-    return success_response(msg="任务已取消" if success else "取消失败")
+    status = TaskStatusManager.get_task_status(taskId)
+    if status == "not_found":
+        raise NotFoundException("任务不存在或已结束")
+    if status == "completed":
+        raise ValidationException("任务已结束，无法取消")
+    if status == "cancelled":
+        raise ValidationException("任务已取消，请勿重复操作")
+    await TaskStatusManager.cancel_task(taskId)
+    return success_response(msg="任务已取消")
+
+
+@router.post("/tasks/running")
+async def get_running_tasks(authorization: Optional[str] = Header(None)):
+    await get_current_user_id(authorization)
+    tasks = TaskStatusManager.get_running_tasks()
+    result = [
+        {
+            "taskId": info["task_id"],
+            "startTime": info["start_time"],
+            "status": "running",
+        }
+        for info in tasks.values()
+    ]
+    return success_response(result)
+
+
+@router.post("/task/latest-results")
+async def get_latest_results(
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = await get_current_user_id(authorization)
+    results = await get_latest_execution_results(session, user_id)
+    return success_response(results)
+
+
+@router.post("/task/history")
+async def get_task_history(
+    request: TaskHistoryRequest,
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = await get_current_user_id(authorization)
+    history = await get_task_execution_history(session, user_id, request.taskConfigId)
+    return success_response(history)
 
 
 @router.websocket("/ws/logs")

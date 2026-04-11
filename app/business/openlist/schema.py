@@ -87,3 +87,7 @@ class TaskStats(BaseModel):
     totalSubtitles: int = 0
     successSubtitles: int = 0
     errorSubtitles: int = 0
+
+
+class TaskHistoryRequest(BaseModel):
+    taskConfigId: int = Field(..., description="任务配置 ID")
