@@ -208,7 +208,7 @@ async def execute_strm_task(
             TaskStatusManager.unregister_task(task_id)
 
     task = asyncio.create_task(run_task())
-    TaskStatusManager.register_task(task_id, task)
+    TaskStatusManager.register_task(task_id, task, task_name=task_config["name"])
     return success_response({"taskId": task_id, "message": "任务已开始执行"})
 
 
@@ -233,6 +233,7 @@ async def get_running_tasks(authorization: Optional[str] = Header(None)):
     result = [
         {
             "taskId": info["task_id"],
+            "taskName": info.get("task_name", ""),
             "startTime": info["start_time"],
             "status": "running",
         }

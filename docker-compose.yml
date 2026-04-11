@@ -6,7 +6,7 @@ services:
     container_name: cloud-nav
     restart: unless-stopped
     ports:
-      - '8000:8000'
+      - '8821:8000'
     environment:
       - APP_NAME=Cloud Server
       - APP_VERSION=2.0.0

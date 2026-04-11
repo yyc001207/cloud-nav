@@ -8,11 +8,12 @@ class TaskStatusManager:
     _running_tasks: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
-    def register_task(cls, task_id: str, task: asyncio.Task) -> None:
+    def register_task(cls, task_id: str, task: asyncio.Task, task_name: str = "") -> None:
         cls._running_tasks[task_id] = {
             "task": task,
             "cancelled": False,
             "start_time": datetime.utcnow(),
+            "task_name": task_name,
         }
         logger.info(f"任务 {task_id} 已注册")
 
@@ -62,6 +63,7 @@ class TaskStatusManager:
                     "task_id": task_id,
                     "start_time": info["start_time"],
                     "cancelled": info["cancelled"],
+                    "task_name": info.get("task_name", ""),
                 }
         return result
 

@@ -3,6 +3,8 @@ from pathlib import Path
 from urllib.parse import quote
 from typing import Dict, Any
 import asyncio
+import shutil
+import os
 from app.business.openlist.openlist_api import OpenListAPI
 from app.business.openlist.task_status_manager import TaskStatusManager
 from app.core.logger import get_strm_logger
@@ -120,6 +122,7 @@ class STRMGenerator:
         except Exception as e:
             self.logger.error(f"扫描失败 {scan_path}: {e}")
             return
+        cloud_dir_names = set()
         for item in items:
             if not item.get("is_dir", False):
                 item_name = item.get("name", "")
@@ -130,6 +133,9 @@ class STRMGenerator:
                 if file_ext in self.video_exts:
                     relative_path = str(relative_path).rsplit(".", 1)[0] + ".strm"
                 cloud_files.add(relative_path)
+            else:
+                dir_name = item.get("name", "")
+                cloud_dir_names.add(self._sanitize_path(dir_name))
         for item in items:
             if item.get("is_dir", False):
                 subdir_name = item.get("name", "")
@@ -138,12 +144,12 @@ class STRMGenerator:
                 await self._scan_and_process(subdir_path, output_base, force, base_path, sub_cloud_files)
                 if sub_cloud_files:
                     cloud_files.update(sub_cloud_files)
-        self._cleanup_current_dir(output_base, cloud_files, base_path, scan_path)
+        self._cleanup_current_dir(output_base, cloud_files, base_path, scan_path, cloud_dir_names)
         tasks = [self._process_file(item, scan_path, output_base, force, base_path) for item in items if not item.get("is_dir", False)]
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    def _cleanup_current_dir(self, output_base: Path, cloud_files: set, base_path: str, scan_path: str):
+    def _cleanup_current_dir(self, output_base: Path, cloud_files: set, base_path: str, scan_path: str, cloud_dir_names: set = None):
         if not cloud_files:
             return
         output_relative = self._get_output_path(scan_path, base_path)
@@ -185,6 +191,28 @@ class STRMGenerator:
                     self.logger.info(f"删除已失效文件: {relative_str}")
                 except Exception as e:
                     self.logger.error(f"删除文件失败 {local_file}: {e}")
+        if cloud_dir_names is not None:
+            for local_item in current_dir.iterdir():
+                if local_item.is_dir():
+                    sanitized_name = self._sanitize_path(local_item.name)
+                    if sanitized_name not in cloud_dir_names:
+                        try:
+                            shutil.rmtree(str(local_item))
+                            self.logger.info(f"删除已失效目录: {local_item}")
+                        except Exception as e:
+                            self.logger.error(f"删除目录失败 {local_item}: {e}")
+
+    def _cleanup_empty_dirs(self, output_base: Path):
+        for dirpath, dirnames, filenames in os.walk(str(output_base), topdown=False):
+            current = Path(dirpath)
+            if current == output_base:
+                continue
+            try:
+                if not any(current.iterdir()):
+                    current.rmdir()
+                    self.logger.info(f"清理空目录: {current}")
+            except Exception as e:
+                self.logger.error(f"清理空目录失败 {current}: {e}")
 
     async def execute(self, force: bool = False, cleanup: bool = True) -> Dict[str, Any]:
         if self.output_dir.startswith("/"):
@@ -201,5 +229,6 @@ class STRMGenerator:
             base_path = task_path.strip("/")
             cloud_files = set()
             await self._scan_and_process(task_path, output_base, force, base_path, cloud_files)
+        self._cleanup_empty_dirs(output_base)
         self.logger.info(f"完成: 视频 {self.stats['successVideos']}/{self.stats['totalVideos']}, 字幕 {self.stats['successSubtitles']}/{self.stats['totalSubtitles']}")
         return self.stats

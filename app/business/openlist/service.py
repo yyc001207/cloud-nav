@@ -5,7 +5,7 @@ from app.core.models import OpenListGlobalConfigModel, OpenListTaskConfigModel
 from app.core.exceptions import NotFoundException, ValidationException
 from app.utils.helpers import mask_sensitive_data
 from app.core.logger import logger
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 
 def _mask_token(token: str) -> str:
@@ -285,6 +285,33 @@ async def add_execution_record(
     return task_config_to_response(config)
 
 
+_BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _to_beijing_time(utc_iso_str: str) -> Optional[str]:
+    if not utc_iso_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(utc_iso_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(_BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return utc_iso_str
+
+
+def _format_execution_status(success: bool) -> str:
+    return "成功" if success else "失败"
+
+
+def _format_execution_info(record: dict) -> str:
+    sv = record.get("successVideos", 0)
+    tv = record.get("totalVideos", 0)
+    ss = record.get("successSubtitles", 0)
+    ts = record.get("totalSubtitles", 0)
+    return f"视频: ({sv}/{tv}), 字幕: ({ss}/{ts})"
+
+
 async def get_latest_execution_results(
     session: AsyncSession, user_id: int
 ) -> list[dict]:
@@ -299,19 +326,32 @@ async def get_latest_execution_results(
     for config in configs:
         history = config.execution_history or []
         latest = history[-1] if history else None
-        results.append(
-            {
-                "taskConfigId": config.id,
-                "taskConfigName": config.name,
-                "latestExecution": latest,
-            }
-        )
+        if latest:
+            results.append(
+                {
+                    "taskConfigId": config.id,
+                    "taskName": config.name,
+                    "executionStatus": _format_execution_status(latest.get("success", False)),
+                    "executionInfo": _format_execution_info(latest),
+                    "executionTime": _to_beijing_time(latest.get("timestamp", "")),
+                }
+            )
+        else:
+            results.append(
+                {
+                    "taskConfigId": config.id,
+                    "taskName": config.name,
+                    "executionStatus": None,
+                    "executionInfo": None,
+                    "executionTime": None,
+                }
+            )
     return results
 
 
 async def get_task_execution_history(
     session: AsyncSession, user_id: int, task_config_id: int
-) -> list[dict]:
+) -> dict:
     stmt = select(OpenListTaskConfigModel).where(
         OpenListTaskConfigModel.id == task_config_id,
         OpenListTaskConfigModel.user_id == user_id,
@@ -319,4 +359,30 @@ async def get_task_execution_history(
     config = (await session.execute(stmt)).scalar_one_or_none()
     if not config:
         raise NotFoundException("任务配置")
-    return config.execution_history or []
+    history = config.execution_history or []
+    latest = history[-1] if history else None
+    latest_detail = None
+    if latest:
+        latest_detail = {
+            "executionStatus": _format_execution_status(latest.get("success", False)),
+            "totalVideos": latest.get("totalVideos", 0),
+            "successVideos": latest.get("successVideos", 0),
+            "successSubtitles": latest.get("successSubtitles", 0),
+            "errorSubtitles": latest.get("errorSubtitles", 0),
+            "executionTime": _to_beijing_time(latest.get("timestamp", "")),
+        }
+    history_list = []
+    for record in reversed(history):
+        history_list.append(
+            {
+                "executionStatus": _format_execution_status(record.get("success", False)),
+                "executionInfo": _format_execution_info(record),
+                "executionTime": _to_beijing_time(record.get("timestamp", "")),
+            }
+        )
+    return {
+        "taskConfigId": config.id,
+        "taskName": config.name,
+        "latestDetail": latest_detail,
+        "historyList": history_list,
+    }
