@@ -37,13 +37,15 @@ services:
     volumes:
       - ./prod/uploads:/app/uploads
       - ./prod/logs:/app/logs
-      - D:/emby:/app/output
+      - D:/test:/app/output
     networks:
       - mysql-network
       - redis-network
 
 networks:
   mysql-network:
+    name: mysql_mysql-network
     external: true
   redis-network:
+    name: redis_redis-network
     external: true
