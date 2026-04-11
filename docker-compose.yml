@@ -35,8 +35,9 @@ services:
       - QWEATHER_KEY=${QWEATHER_KEY:-}
       - HOLIDAY_API_BASE=http://timor.tech/api/holiday/year
     volumes:
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
+      - ./prod/uploads:/app/uploads
+      - ./prod/logs:/app/logs
+      - D:/emby:/app/output
     networks:
       - mysql-network
       - redis-network
