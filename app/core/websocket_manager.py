@@ -40,7 +40,3 @@ manager = ConnectionManager()
 
 async def broadcast_log(log_data: dict):
     await manager.broadcast(log_data, "all")
-    level = log_data.get("level", "").upper()
-    if level in ("ERROR", "CRITICAL"):
-        await manager.broadcast(log_data, "strm_error")
-    await manager.broadcast(log_data, "strm_logs")

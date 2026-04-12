@@ -1,10 +1,10 @@
 import os
 from typing import Optional
 from datetime import datetime, timedelta
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models import TextTransferModel, FileTransferModel
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.core.logger import logger
 
 
@@ -153,7 +153,7 @@ async def create_file_transfer(session: AsyncSession, data: dict, user_id: int) 
         user_id=user_id,
         filename=data["filename"],
         file_size=data["fileSize"],
-        file_hash=data["fileHash"],
+        file_hash=data.get("fileHash"),
         content_type=data["contentType"],
         status="pending",
         chunks_uploaded=0,
@@ -162,6 +162,32 @@ async def create_file_transfer(session: AsyncSession, data: dict, user_id: int) 
     session.add(file)
     await session.commit()
     await session.refresh(file)
+    return file_transfer_to_dict(file)
+
+
+DIRECT_UPLOAD_MAX_SIZE = 5 * 1024 * 1024
+
+
+async def direct_upload_file(session: AsyncSession, file_data: bytes, data: dict, user_id: int) -> dict:
+    if data["fileSize"] > DIRECT_UPLOAD_MAX_SIZE:
+        raise ValidationException("文件大小超过5MB，请使用分片上传")
+    file = FileTransferModel(
+        user_id=user_id,
+        filename=data["filename"],
+        file_size=data["fileSize"],
+        file_hash=data.get("fileHash"),
+        content_type=data["contentType"],
+        status="completed",
+        chunks_uploaded=1,
+        total_chunks=1,
+    )
+    session.add(file)
+    await session.commit()
+    await session.refresh(file)
+    file_path = get_file_path(file.id)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "wb") as f:
+        f.write(file_data)
     return file_transfer_to_dict(file)
 
 
@@ -190,7 +216,12 @@ async def upload_chunk(
     chunk_path = get_chunk_path(file_id, chunk_index)
     with open(chunk_path, "wb") as f:
         f.write(chunk_data)
-    file.chunks_uploaded = (file.chunks_uploaded or 0) + 1
+    stmt = (
+        sa_update(FileTransferModel)
+        .where(FileTransferModel.id == file_id)
+        .values(chunks_uploaded=FileTransferModel.chunks_uploaded + 1)
+    )
+    await session.execute(stmt)
     await session.commit()
     return True
 
@@ -205,6 +236,8 @@ async def complete_upload(
     file = result.scalar_one_or_none()
     if not file:
         return False
+    if file.chunks_uploaded != total_chunks:
+        raise ValidationException(f"分片不完整，已上传{file.chunks_uploaded}片，需要{total_chunks}片")
     file_path = get_file_path(file_id)
     with open(file_path, "wb") as f:
         for i in range(total_chunks):
@@ -313,3 +346,18 @@ async def get_file_for_download(
     result = await session.execute(stmt)
     file = result.scalar_one_or_none()
     return file
+
+
+async def update_file_transfer_status(
+    session: AsyncSession, file_id: int, user_id: int, status: str
+) -> bool:
+    stmt = select(FileTransferModel).where(
+        FileTransferModel.id == file_id, FileTransferModel.user_id == user_id
+    )
+    result = await session.execute(stmt)
+    file = result.scalar_one_or_none()
+    if not file:
+        return False
+    file.status = status
+    await session.commit()
+    return True

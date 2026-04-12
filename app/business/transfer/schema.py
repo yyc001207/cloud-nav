@@ -25,7 +25,7 @@ class TextTransferResponse(BaseModel):
 class FileTransferCreateRequest(BaseModel):
     filename: str = Field(..., description="文件名")
     fileSize: int = Field(..., description="文件大小")
-    fileHash: str = Field(..., description="文件哈希值")
+    fileHash: Optional[str] = Field(None, description="文件哈希值")
     contentType: str = Field(..., description="文件类型")
 
 
@@ -68,3 +68,15 @@ class TransferListRequest(BaseModel):
 
 class FileDownloadRequest(BaseModel):
     fileId: int = Field(..., description="文件 ID")
+
+
+class FileDirectUploadRequest(BaseModel):
+    filename: str = Field(..., description="文件名")
+    fileSize: int = Field(..., description="文件大小")
+    fileHash: Optional[str] = Field(None, description="文件哈希值")
+    contentType: str = Field(..., description="文件类型")
+
+
+class FileStatusUpdateRequest(BaseModel):
+    id: int = Field(..., description="文件 ID")
+    status: str = Field(..., description="文件状态")

@@ -150,8 +150,6 @@ class STRMGenerator:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     def _cleanup_current_dir(self, output_base: Path, cloud_files: set, base_path: str, scan_path: str, cloud_dir_names: set = None):
-        if not cloud_files:
-            return
         output_relative = self._get_output_path(scan_path, base_path)
         output_relative = self._sanitize_path(output_relative)
         current_dir = output_base / output_relative

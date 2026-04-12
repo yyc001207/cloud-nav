@@ -262,27 +262,31 @@ async def add_execution_record(
     message: str = "",
     **stats,
 ) -> dict:
-    stmt = select(OpenListTaskConfigModel).where(
-        OpenListTaskConfigModel.id == config_id,
-        OpenListTaskConfigModel.user_id == user_id,
-    )
-    config = (await session.execute(stmt)).scalar_one_or_none()
-    if not config:
-        raise NotFoundException("任务配置")
-    history = config.execution_history or []
-    record = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "success": success,
-        "message": message,
-        **stats,
-    }
-    history.append(record)
-    if len(history) > 20:
-        history = history[-20:]
-    config.execution_history = history
-    await session.commit()
-    await session.refresh(config)
-    return task_config_to_response(config)
+    from app.core.database import async_session_factory
+    async with async_session_factory() as independent_session:
+        stmt = select(OpenListTaskConfigModel).where(
+            OpenListTaskConfigModel.id == config_id,
+            OpenListTaskConfigModel.user_id == user_id,
+        ).with_for_update()
+        config = (await independent_session.execute(stmt)).scalar_one_or_none()
+        if not config:
+            raise NotFoundException("任务配置")
+        history = config.execution_history or []
+        record = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "success": success,
+            "message": message,
+            **stats,
+        }
+        history.append(record)
+        if len(history) > 20:
+            history = history[-20:]
+        config.execution_history = history
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(config, 'execution_history')
+        await independent_session.commit()
+        await independent_session.refresh(config)
+        return task_config_to_response(config)
 
 
 _BEIJING_TZ = timezone(timedelta(hours=8))

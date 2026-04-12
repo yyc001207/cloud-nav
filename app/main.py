@@ -7,7 +7,8 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.redis import init_redis, close_redis
-from app.core.logger import setup_logger, logger
+from app.core.logger import setup_logger, logger, set_websocket_broadcast
+from app.core.websocket_manager import manager
 from app.core.exceptions import AppException, RequestValidationError
 from fastapi.exceptions import RequestValidationError as FastAPIRequestValidationError
 from app.core.exceptions import (
@@ -24,6 +25,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} 启动中...")
     await init_db()
     await init_redis()
+    set_websocket_broadcast(manager.broadcast)
     upload_dir = Path(settings.UPLOAD_DIR)
     upload_dir.mkdir(parents=True, exist_ok=True)
     log_dir = Path(settings.LOG_DIR)

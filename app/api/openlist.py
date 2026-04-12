@@ -32,7 +32,7 @@ from app.business.openlist.service import (
 from app.business.openlist.strm_generator import STRMGenerator
 from app.business.openlist.task_status_manager import TaskStatusManager
 from app.core.websocket_manager import manager
-from app.core.logger import logger, set_websocket_broadcast
+from app.core.logger import logger
 from app.utils.response import success_response, paginated_response
 from app.core.exceptions import NotFoundException, ValidationException
 from app.api.user import get_current_user_id
@@ -264,11 +264,49 @@ async def get_task_history(
 
 
 @router.websocket("/ws/logs")
-async def websocket_logs(websocket: WebSocket):
+async def websocket_logs(websocket: WebSocket, token: Optional[str] = None):
+    if not token:
+        await websocket.close(code=4001, reason="Missing authentication token")
+        return
+    try:
+        from app.utils.security import verify_token
+        await verify_token(token)
+    except Exception:
+        await websocket.close(code=4001, reason="Invalid authentication token")
+        return
     await manager.connect(websocket, "all")
-    set_websocket_broadcast(manager.broadcast)
+
+    last_pong = asyncio.get_event_loop().time()
+
+    async def heartbeat():
+        nonlocal last_pong
+        while True:
+            try:
+                await asyncio.sleep(30)
+                await websocket.send_text('{"type":"ping"}')
+                await asyncio.sleep(60)
+                now = asyncio.get_event_loop().time()
+                if now - last_pong > 60:
+                    await websocket.close(code=4002, reason="Heartbeat timeout")
+                    break
+            except Exception:
+                break
+
+    heartbeat_task = asyncio.create_task(heartbeat())
+
     try:
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            if data:
+                try:
+                    import json
+                    msg = json.loads(data)
+                    if msg.get("type") == "pong":
+                        last_pong = asyncio.get_event_loop().time()
+                except Exception:
+                    pass
     except WebSocketDisconnect:
+        pass
+    finally:
+        heartbeat_task.cancel()
         manager.disconnect(websocket, "all")
