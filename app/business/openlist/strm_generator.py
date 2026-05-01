@@ -120,7 +120,8 @@ class STRMGenerator:
             result = await self.api.list_files("/" + scan_path)
             items = result.get("content") or []
         except Exception as e:
-            self.logger.error(f"扫描失败 {scan_path}: {e}")
+            self.logger.error(f"扫描失败 {scan_path}: {e}，清理本地残留")
+            self._cleanup_current_dir(output_base, set(), base_path, scan_path, set())
             return
         cloud_dir_names = set()
         for item in items:
