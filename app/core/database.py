@@ -18,7 +18,7 @@ async def init_db() -> None:
         settings.MYSQL_URL,
         pool_size=settings.MYSQL_POOL_SIZE,
         max_overflow=settings.MYSQL_MAX_OVERFLOW,
-        pool_pre_ping=True,
+        pool_pre_ping=False,
         echo=settings.DEBUG,
     )
     async_session_factory = async_sessionmaker(

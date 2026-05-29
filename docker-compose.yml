@@ -37,7 +37,7 @@ services:
     volumes:
       - ./prod/uploads:/app/uploads
       - ./prod/logs:/app/logs
-      - D:/emby:/app/output
+      - C:/Users/15363/Videos/emby:/app/output
     networks:
       - mysql-network
       - redis-network
