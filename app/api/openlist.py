@@ -1,7 +1,6 @@
 import asyncio
 import uuid
-from fastapi import APIRouter, Depends, Header, WebSocket, WebSocketDisconnect
-from typing import Optional
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.business.openlist.schema import (
@@ -42,10 +41,9 @@ router = APIRouter(prefix="/api/openlist", tags=["OpenList STRM"])
 
 @router.post("/global-config")
 async def get_global_config_route(
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     config = await get_global_config(session, user_id)
     return success_response(config)
 
@@ -53,10 +51,9 @@ async def get_global_config_route(
 @router.post("/global-config/add")
 async def add_global_config(
     request: OpenListGlobalConfigCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await create_global_config(session, user_id, data)
     return success_response(config)
@@ -65,10 +62,9 @@ async def add_global_config(
 @router.post("/global-config/update")
 async def update_global_config_route(
     request: OpenListGlobalConfigUpdateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await update_global_config(session, user_id, data)
     return success_response(config)
@@ -76,10 +72,9 @@ async def update_global_config_route(
 
 @router.post("/global-config/delete")
 async def delete_global_config_route(
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await delete_global_config(session, user_id)
     if not success:
         raise NotFoundException("全局配置")
@@ -89,10 +84,9 @@ async def delete_global_config_route(
 @router.post("/task-config/list")
 async def list_task_configs_route(
     request: TaskConfigListRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     configs, total = await list_task_configs(
         session,
         user_id,
@@ -110,10 +104,9 @@ async def list_task_configs_route(
 @router.post("/task-config")
 async def get_task_config_route(
     id: int,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     config = await get_task_config(session, user_id, id)
     if not config:
         raise NotFoundException("任务配置")
@@ -123,10 +116,9 @@ async def get_task_config_route(
 @router.post("/task-config/add")
 async def add_task_config(
     request: OpenListTaskConfigCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await create_task_config(session, user_id, data)
     return success_response(config)
@@ -136,10 +128,9 @@ async def add_task_config(
 async def update_task_config_route(
     id: int,
     request: OpenListTaskConfigUpdateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     config = await update_task_config(session, user_id, id, data)
     return success_response(config)
@@ -148,10 +139,9 @@ async def update_task_config_route(
 @router.post("/task-config/delete")
 async def delete_task_config_route(
     id: int,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await delete_task_config(session, user_id, id)
     if not success:
         raise NotFoundException("任务配置")
@@ -161,10 +151,9 @@ async def delete_task_config_route(
 @router.post("/execute")
 async def execute_strm_task(
     request: OpenListExecuteRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     global_config = await get_global_config_by_id(
         session, request.globalConfigId, user_id
     )
@@ -213,8 +202,7 @@ async def execute_strm_task(
 
 
 @router.post("/cancel")
-async def cancel_strm_task(taskId: str, authorization: Optional[str] = Header(None)):
-    await get_current_user_id(authorization)
+async def cancel_strm_task(taskId: str, user_id: int = Depends(get_current_user_id)):
     status = TaskStatusManager.get_task_status(taskId)
     if status == "not_found":
         raise NotFoundException("任务不存在或已结束")
@@ -227,8 +215,7 @@ async def cancel_strm_task(taskId: str, authorization: Optional[str] = Header(No
 
 
 @router.post("/tasks/running")
-async def get_running_tasks(authorization: Optional[str] = Header(None)):
-    await get_current_user_id(authorization)
+async def get_running_tasks(user_id: int = Depends(get_current_user_id)):
     tasks = TaskStatusManager.get_running_tasks()
     result = [
         {
@@ -244,10 +231,9 @@ async def get_running_tasks(authorization: Optional[str] = Header(None)):
 
 @router.post("/task/latest-results")
 async def get_latest_results(
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     results = await get_latest_execution_results(session, user_id)
     return success_response(results)
 
@@ -255,16 +241,16 @@ async def get_latest_results(
 @router.post("/task/history")
 async def get_task_history(
     request: TaskHistoryRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     history = await get_task_execution_history(session, user_id, request.taskConfigId)
     return success_response(history)
 
 
 @router.websocket("/ws/logs")
-async def websocket_logs(websocket: WebSocket, token: Optional[str] = None):
+async def websocket_logs(websocket: WebSocket):
+    token = websocket.cookies.get("token")
     if not token:
         await websocket.close(code=4001, reason="Missing authentication token")
         return

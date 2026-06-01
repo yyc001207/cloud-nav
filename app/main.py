@@ -16,7 +16,7 @@ from app.core.exceptions import (
     validation_exception_handler,
     generic_exception_handler,
 )
-from app.api import auth, user, nav, system, upload, proxy, transfer, openlist
+from app.api import auth, user, nav, system, upload, proxy, transfer, openlist, verify
 
 
 @asynccontextmanager
@@ -44,9 +44,10 @@ app = FastAPI(
 )
 
 
+cors_origins = settings.CORS_ORIGINS.split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,6 +67,7 @@ app.include_router(upload.router)
 app.include_router(proxy.router)
 app.include_router(transfer.router)
 app.include_router(openlist.router)
+app.include_router(verify.router)
 
 
 static_dir = Path(settings.UPLOAD_DIR)

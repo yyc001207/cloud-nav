@@ -4,7 +4,7 @@ import hashlib
 from datetime import datetime as dt, timezone as tz
 from email.utils import parsedate_to_datetime
 from urllib.parse import quote
-from fastapi import APIRouter, Depends, Header, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Form
 from typing import Optional
 from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,10 +45,9 @@ router = APIRouter(prefix="/api/transfer", tags=["中转站"])
 @router.post("/text/list")
 async def list_text_transfers(
     request: TransferListRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     if request.date:
         texts = await get_text_transfers_by_date(session, user_id, request.date)
         return success_response(texts)
@@ -64,10 +63,9 @@ async def list_text_transfers(
 @router.post("/text/add")
 async def add_text_transfer(
     request: TextTransferCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     text = await create_text_transfer(session, data, user_id)
     return success_response(text)
@@ -76,10 +74,9 @@ async def add_text_transfer(
 @router.post("/text/update")
 async def update_text_transfer_route(
     request: TextTransferUpdateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     text = await update_text_transfer(session, request.id, data, user_id)
     if not text:
@@ -90,10 +87,9 @@ async def update_text_transfer_route(
 @router.post("/text/delete")
 async def delete_text_transfer_route(
     id: int,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await delete_text_transfer(session, id, user_id)
     if not success:
         raise NotFoundException("文本中转")
@@ -103,10 +99,9 @@ async def delete_text_transfer_route(
 @router.post("/file/create")
 async def create_file_transfer_route(
     request: FileTransferCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     file = await create_file_transfer(session, data, user_id)
     return success_response(file)
@@ -117,10 +112,9 @@ async def upload_file_chunk(
     fileId: int = Form(...),
     chunkIndex: int = Form(...),
     chunk: UploadFile = File(...),
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     chunk_data = await chunk.read()
     success = await upload_chunk(session, fileId, chunkIndex, chunk_data, user_id)
     return success_response(msg="分片上传成功" if success else "分片上传失败")
@@ -133,10 +127,9 @@ async def direct_upload_file_route(
     fileSize: Optional[int] = Form(None),
     fileHash: Optional[str] = Form(None),
     contentType: Optional[str] = Form(None),
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     file_data = await file.read()
     actual_filename = filename or file.filename or "unknown"
     actual_size = fileSize or len(file_data)
@@ -154,10 +147,9 @@ async def direct_upload_file_route(
 @router.post("/file/complete")
 async def complete_file_upload(
     request: FileCompleteRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await complete_upload(
         session, request.fileId, request.totalChunks, user_id
     )
@@ -167,10 +159,9 @@ async def complete_file_upload(
 @router.post("/file/list")
 async def list_file_transfers(
     request: TransferListRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     files, total = await get_file_transfers_by_user(
         session, user_id, request.pageNum, request.pageSize,
         request.keyword, request.status, request.orderBy, request.orderDir
@@ -183,10 +174,9 @@ async def list_file_transfers(
 @router.post("/file/delete")
 async def delete_file_transfer_route(
     id: int,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await delete_file_transfer(session, id, user_id)
     if not success:
         raise NotFoundException("文件中转")
@@ -196,10 +186,9 @@ async def delete_file_transfer_route(
 @router.post("/file/update")
 async def update_file_status_route(
     request: FileStatusUpdateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await update_file_transfer_status(session, request.id, user_id, request.status)
     if not success:
         raise NotFoundException("文件中转")
@@ -232,13 +221,12 @@ def parse_range_header(range_header: str, file_size: int):
 async def download_file(
     request: FileDownloadRequest,
     fastapi_request: Request,
-    authorization: Optional[str] = Header(None),
-    range: Optional[str] = Header(None),
-    if_none_match: Optional[str] = Header(None),
-    if_modified_since: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
+    range: Optional[str] = None,
+    if_none_match: Optional[str] = None,
+    if_modified_since: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     file_record = await get_file_for_download(session, request.fileId, user_id)
     if not file_record:
         raise NotFoundException("文件")
@@ -301,14 +289,13 @@ async def download_file(
 @router.get("/file/download/{file_id}")
 async def download_file_get(
     file_id: int,
-    token: Optional[str] = None,
-    fastapi_request: Request = None,
-    range: Optional[str] = Header(None),
-    if_none_match: Optional[str] = Header(None),
-    if_modified_since: Optional[str] = Header(None),
+    fastapi_request: Request,
+    user_id: int = Depends(get_current_user_id),
+    range: Optional[str] = None,
+    if_none_match: Optional[str] = None,
+    if_modified_since: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization=token)
     file_record = await get_file_for_download(session, file_id, user_id)
     if not file_record:
         raise NotFoundException("文件")

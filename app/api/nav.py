@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, Header
-from typing import Optional
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.business.nav.schema import (
@@ -32,10 +31,9 @@ router = APIRouter(prefix="/api/nav", tags=["导航管理"])
 @router.post("/tabs")
 async def list_tabs(
     request: TabListRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     tabs, total = await get_all_tabs(
         session, user_id, request.pageNum, request.pageSize,
         request.label, request.orderBy, request.orderDir
@@ -48,10 +46,9 @@ async def list_tabs(
 @router.post("/tab/add")
 async def add_tab(
     request: TabCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     tab = await create_tab(session, data, user_id)
     return success_response(tab)
@@ -60,10 +57,9 @@ async def add_tab(
 @router.post("/tab/update")
 async def update_tab_route(
     request: TabUpdateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     tab = await update_tab(session, request.id, data, user_id)
     if not tab:
@@ -74,10 +70,9 @@ async def update_tab_route(
 @router.post("/tab/delete")
 async def delete_tab_route(
     id: int,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await delete_tab(session, id, user_id)
     if not success:
         raise NotFoundException("标签")
@@ -87,10 +82,9 @@ async def delete_tab_route(
 @router.post("/websites")
 async def list_websites(
     request: WebsiteListRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     websites, total = await get_all_websites(
         session,
         user_id,
@@ -109,10 +103,9 @@ async def list_websites(
 @router.post("/website/add")
 async def add_website(
     request: WebsiteCreateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     website = await create_website(session, data, user_id)
     return success_response(website)
@@ -121,10 +114,9 @@ async def add_website(
 @router.post("/website/update")
 async def update_website_route(
     request: WebsiteUpdateRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     data = request.model_dump(exclude_unset=True, exclude_none=True)
     website = await update_website(session, request.id, data, user_id)
     if not website:
@@ -135,10 +127,9 @@ async def update_website_route(
 @router.post("/website/delete")
 async def delete_website_route(
     id: int,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     success = await delete_website(session, id, user_id)
     if not success:
         raise NotFoundException("网站")
@@ -148,10 +139,9 @@ async def delete_website_route(
 @router.post("/website/order")
 async def update_website_order(
     request: WebsiteOrderRequest,
-    authorization: Optional[str] = Header(None),
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    user_id = await get_current_user_id(authorization)
     await batch_update_website_order(
         session, request.tabId, request.websiteIds, user_id
     )

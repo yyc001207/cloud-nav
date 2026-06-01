@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
+from fastapi import Request
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.core.config import settings
@@ -48,4 +49,11 @@ async def get_token_from_header(authorization: Optional[str] = None, token_param
         raise AuthException("认证令牌格式错误")
     elif token_param:
         return token_param
+    raise AuthException("未提供认证令牌")
+
+
+async def get_token_from_request(request: Request) -> str:
+    token = request.cookies.get("token")
+    if token:
+        return token
     raise AuthException("未提供认证令牌")

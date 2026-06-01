@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
+    COOKIE_DOMAIN: str = ""
+    COOKIE_SECURE: bool = False
+
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+
     QWEATHER_HOST: str = "https://kp7p43ap5m.re.qweatherapi.com"
     QWEATHER_KEY: str = "789888e491fd449cb34cc0f21c040f10"
 

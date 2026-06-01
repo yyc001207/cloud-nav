@@ -11,7 +11,3 @@ def error_response(msg: str = "error", code: int = 500, data: Any = None) -> dic
 
 def paginated_response(data: list, total: int, msg: str = "success") -> dict:
     return {"code": 200, "msg": msg, "data": data, "total": total}
-
-
-def login_success_response(token: str, msg: str = "登录成功") -> dict:
-    return {"code": 200, "msg": msg, "token": token}
