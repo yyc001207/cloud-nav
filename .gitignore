@@ -140,3 +140,4 @@ pytest.ini
 .trae
 output
 prod
+docker-compose.yml

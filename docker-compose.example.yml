@@ -16,13 +16,13 @@ services:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_USER=root
-      - MYSQL_PASSWORD=root123456
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=cloud
       - MYSQL_POOL_SIZE=10
       - MYSQL_MAX_OVERFLOW=20
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=114514
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_DB=0
       - UPLOAD_DIR=uploads
       - MAX_FILE_SIZE=10485760
@@ -31,16 +31,16 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - JWT_ALGORITHM=HS256
       - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
-      - COOKIE_DOMAIN=.yychome.icu
-      - COOKIE_SECURE=True
-      - CORS_ORIGINS=https://yychome.icu,https://www.yychome.icu
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-False}
+      - CORS_ORIGINS=${CORS_ORIGINS}
       - QWEATHER_HOST=${QWEATHER_HOST:-}
       - QWEATHER_KEY=${QWEATHER_KEY:-}
       - HOLIDAY_API_BASE=http://timor.tech/api/holiday/year
     volumes:
       - ./prod/uploads:/app/uploads
       - ./prod/logs:/app/logs
-      - C:/Users/15363/Videos/emby:/app/output
+      - ./prod/output:/app/output
     networks:
       - mysql-network
       - redis-network
