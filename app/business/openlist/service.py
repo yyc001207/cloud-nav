@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.models import OpenListGlobalConfigModel, OpenListTaskConfigModel
+from app.core.models import OpenListGlobalConfigModel, OpenListTaskConfigModel, OpenListPresetConfigModel
 from app.core.exceptions import NotFoundException, ValidationException
 from app.utils.helpers import mask_sensitive_data
 from app.core.logger import logger
@@ -390,3 +390,97 @@ async def get_task_execution_history(
         "latestDetail": latest_detail,
         "historyList": history_list,
     }
+
+
+def preset_to_response(preset: OpenListPresetConfigModel) -> dict:
+    return {
+        "id": preset.id,
+        "name": preset.name,
+        "presetPath": preset.preset_path,
+        "sortOrder": preset.sort_order,
+        "createdAt": str(preset.created_at) if preset.created_at else None,
+        "updatedAt": str(preset.updated_at) if preset.updated_at else None,
+    }
+
+
+async def get_preset_config_list(session: AsyncSession, user_id: int, data: dict) -> tuple[list, int]:
+    conditions = [OpenListPresetConfigModel.user_id == user_id]
+    if data.get("name"):
+        conditions.append(OpenListPresetConfigModel.name.contains(data["name"]))
+
+    count_stmt = select(func.count()).select_from(OpenListPresetConfigModel).where(*conditions)
+    total = (await session.execute(count_stmt)).scalar()
+
+    stmt = select(OpenListPresetConfigModel).where(*conditions)
+
+    order_by = data.get("orderBy")
+    order_dir = data.get("orderDir")
+    if order_by:
+        col = getattr(OpenListPresetConfigModel, order_by, None)
+        if col is not None:
+            stmt = stmt.order_by(col.desc() if order_dir == "descending" else col.asc())
+    else:
+        stmt = stmt.order_by(
+            OpenListPresetConfigModel.sort_order.is_(None).asc(),
+            OpenListPresetConfigModel.sort_order.asc(),
+            OpenListPresetConfigModel.id.asc(),
+        )
+
+    page_num = data.get("pageNum", 1)
+    page_size = data.get("pageSize", 10)
+    stmt = stmt.offset((page_num - 1) * page_size).limit(page_size)
+
+    result = await session.execute(stmt)
+    presets = result.scalars().all()
+    return [preset_to_response(p) for p in presets], total
+
+
+async def add_preset_config(session: AsyncSession, user_id: int, data: dict) -> dict:
+    preset = OpenListPresetConfigModel(
+        user_id=user_id,
+        name=data["name"],
+        preset_path=data["presetPath"],
+        sort_order=data.get("sortOrder"),
+    )
+    session.add(preset)
+    await session.commit()
+    await session.refresh(preset)
+    return preset_to_response(preset)
+
+
+async def update_preset_config(session: AsyncSession, user_id: int, preset_id: int, data: dict) -> dict:
+    stmt = select(OpenListPresetConfigModel).where(
+        OpenListPresetConfigModel.id == preset_id,
+        OpenListPresetConfigModel.user_id == user_id,
+    )
+    result = await session.execute(stmt)
+    preset = result.scalar_one_or_none()
+    if not preset:
+        raise NotFoundException("预设配置不存在")
+
+    field_map = {
+        "name": "name",
+        "presetPath": "preset_path",
+        "sortOrder": "sort_order",
+    }
+    for camel_key, snake_key in field_map.items():
+        if camel_key in data:
+            setattr(preset, snake_key, data[camel_key])
+
+    await session.commit()
+    await session.refresh(preset)
+    return preset_to_response(preset)
+
+
+async def delete_preset_config(session: AsyncSession, user_id: int, preset_id: int) -> bool:
+    stmt = select(OpenListPresetConfigModel).where(
+        OpenListPresetConfigModel.id == preset_id,
+        OpenListPresetConfigModel.user_id == user_id,
+    )
+    result = await session.execute(stmt)
+    preset = result.scalar_one_or_none()
+    if not preset:
+        raise NotFoundException("预设配置不存在")
+    await session.delete(preset)
+    await session.commit()
+    return True

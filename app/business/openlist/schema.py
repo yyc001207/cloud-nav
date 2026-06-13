@@ -91,3 +91,32 @@ class TaskStats(BaseModel):
 
 class TaskHistoryRequest(BaseModel):
     taskConfigId: int = Field(..., description="任务配置 ID")
+
+
+class PresetConfigCreateRequest(BaseModel):
+    name: str = Field(..., description="预设名称")
+    presetPath: str = Field(..., description="预设路径")
+    sortOrder: Optional[int] = Field(None, description="排序")
+
+
+class PresetConfigUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, description="预设名称")
+    presetPath: Optional[str] = Field(None, description="预设路径")
+    sortOrder: Optional[int] = Field(None, description="排序")
+
+
+class PresetConfigListRequest(BaseModel):
+    pageNum: int = Field(1, description="页码")
+    pageSize: int = Field(10, description="每页条数")
+    name: Optional[str] = Field(None, description="预设名称筛选")
+    orderBy: Optional[str] = Field(None, description="排序字段")
+    orderDir: Optional[str] = Field(None, description="排序方向")
+
+
+class PresetConfigResponse(BaseModel):
+    id: int
+    name: str
+    presetPath: str
+    sortOrder: Optional[int] = None
+    createdAt: Optional[str] = None
+    updatedAt: Optional[str] = None

@@ -124,3 +124,15 @@ class OpenListTaskConfigModel(Base):
     execution_history = Column(JSON, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class OpenListPresetConfigModel(Base):
+    __tablename__ = "openlist_preset_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    preset_path = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.business.openlist.schema import (
@@ -11,6 +11,9 @@ from app.business.openlist.schema import (
     OpenListExecuteRequest,
     TaskConfigListRequest,
     TaskHistoryRequest,
+    PresetConfigCreateRequest,
+    PresetConfigUpdateRequest,
+    PresetConfigListRequest,
 )
 from app.business.openlist.service import (
     create_global_config,
@@ -27,6 +30,10 @@ from app.business.openlist.service import (
     get_task_config_by_id,
     get_latest_execution_results,
     get_task_execution_history,
+    get_preset_config_list,
+    add_preset_config,
+    update_preset_config,
+    delete_preset_config,
 )
 from app.business.openlist.strm_generator import STRMGenerator
 from app.business.openlist.task_status_manager import TaskStatusManager
@@ -246,6 +253,50 @@ async def get_task_history(
 ):
     history = await get_task_execution_history(session, user_id, request.taskConfigId)
     return success_response(history)
+
+
+@router.post("/preset-config/list")
+async def list_preset_configs(
+    request: PresetConfigListRequest,
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
+    data = request.model_dump(exclude_unset=True, exclude_none=True)
+    presets, total = await get_preset_config_list(session, user_id, data)
+    return paginated_response(presets, total)
+
+
+@router.post("/preset-config/add")
+async def add_preset_config_endpoint(
+    request: PresetConfigCreateRequest,
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
+    data = request.model_dump(exclude_unset=True, exclude_none=True)
+    preset = await add_preset_config(session, user_id, data)
+    return success_response(preset)
+
+
+@router.post("/preset-config/update")
+async def update_preset_config_endpoint(
+    id: int = Query(...),
+    request: PresetConfigUpdateRequest = None,
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
+    data = request.model_dump(exclude_unset=True, exclude_none=True)
+    preset = await update_preset_config(session, user_id, id, data)
+    return success_response(preset)
+
+
+@router.post("/preset-config/delete")
+async def delete_preset_config_endpoint(
+    id: int = Query(...),
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
+    await delete_preset_config(session, user_id, id)
+    return success_response()
 
 
 @router.websocket("/ws/logs")
